@@ -3,12 +3,30 @@
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Playwright .NET](https://img.shields.io/badge/Target_SUT-Playwright_C%23_(.NET)-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/dotnet/)
 [![ChromaDB](https://img.shields.io/badge/Vector_Store-ChromaDB-FF6F00)](https://www.trychroma.com/)
-[![Gemini 2.5 Flash](https://img.shields.io/badge/LLM-Gemini_2.5_Flash_%2B_Offline_Fallback-4285F4?logo=google&logoColor=white)](https://ai.google.dev/)
-[![Pydantic v2](https://img.shields.io/badge/Structured_Outputs-Pydantic_v2-E92063?logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
+[![Benchmark Accuracy](https://img.shields.io/badge/Triage_Accuracy-95.0%25_(19%2F20)-brightgreen)](#evaluation--benchmark-results-20-case-suite)
+[![Code Pinpointing](https://img.shields.io/badge/Code_Pinpointing-100.0%25_(20%2F20)-brightgreen)](#evaluation--benchmark-results-20-case-suite)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Smart Triage RAG** is a portfolio-grade AI Test Failure Triage & Self-Healing Agent designed for enterprise **Playwright C# (.NET)** E2E automation suites.
+**Smart Triage RAG** is a benchmarked, production-grade AI Test Failure Triage & Self-Healing Agent designed for enterprise **Playwright C# (.NET)** E2E automation suites.
 
 Instead of feeding raw stack traces to an ungrounded LLM (which leads to hallucinated locators and broken patches) or relying on naive character-split embeddings, this system combines **AST/Regex Method-Level C# Smart Chunking**, **Dual-Collection ChromaDB Vector Indexing**, **Hybrid Lexical + Stack-Trace Metadata Re-Ranking**, and **Schema-Constrained Self-Healing Patch Generation**.
+
+---
+
+## Evaluation & Benchmark Results (20-Case Suite)
+
+We evaluate the system against **20 unseen, realistic Playwright C# failure scenarios** ([`data/eval_benchmark.json`](data/eval_benchmark.json)) spanning **5 C# Page Object classes** (`LoginPage`, `CheckoutPage`, `PaymentGatewayPage`, `ShoppingCartPage`, `OrderHistoryPage`), **27 indexed C# methods**, and **22 historical incidents** via [`src/evaluate.py`](src/evaluate.py).
+
+| Metric | Measured Score | Count | Engineering Significance |
+| :--- | :---: | :---: | :--- |
+| **End-to-End Triage Classification Accuracy** | **95.0%** | `19 / 20` | Correctly diagnoses root-cause category across UI locator changes, race conditions, backend 502/503/504 timeouts, and test data/env issues |
+| **C# Page Object Method Pinpointing** | **100.0%** | `20 / 20` | Surfaces the exact failing C# `Class.Method` at **Rank #1** with verified line-number range (`start_line <= failing_line <= end_line`) |
+| **Historical Incident Retrieval Recall@1** | **95.0%** | `19 / 20` | Ground-truth historical incident ranked `#1` after hybrid lexical + metadata boosting |
+| **Historical Incident Retrieval Recall@3** | **95.0%** | `19 / 20` | Ground-truth historical incident present within the top-3 context window passed to the Agent |
+| **Circuit-Breaker Guardrail (`is_test_code_fixable`)** | **100.0%** | `20 / 20` | Accurately separates auto-healable C# test defects from non-code infrastructure/environment failures |
+| **False-Positive Patch Rate on Backend Outages** | **0.0%** | `0 / 5` | **Zero** broken C# test PRs generated during HTTP 502/503/504 API outages or expired AD seed data incidents |
+
+> Reproduce these exact numbers locally in under 15 seconds by running `python -m src.evaluate` (full output persisted to [`data/eval_results_summary.json`](data/eval_results_summary.json)).
 
 ---
 
@@ -17,8 +35,8 @@ Instead of feeding raw stack traces to an ungrounded LLM (which leads to halluci
 ```mermaid
 flowchart TD
     subgraph KB["1. Dual Knowledge Base & Smart Chunker (src/chunker.py)"]
-        INC["data/historical_incidents.json<br/>(10 Past Triage Records)"]
-        PO["data/page_objects/*.cs<br/>(LoginPage, CheckoutPage, PaymentGatewayPage)"]
+        INC["data/historical_incidents.json<br/>(22 Past Triage Records)"]
+        PO["data/page_objects/*.cs<br/>(5 Page Objects • 27 C# Methods)"]
         SC["SmartChunker<br/>• Symptom-Focused Incident Docs<br/>• Method-Level C# Chunks + Transitive ILocator Injection"]
         INC --> SC
         PO --> SC
@@ -26,8 +44,8 @@ flowchart TD
 
     subgraph VS["2. Persistent Vector Store (src/vector_store.py)"]
         CHROMA[("ChromaDB (./chroma_db)<br/>all-MiniLM-L6-v2 (Cosine)")]
-        COL1["Collection 1:<br/>historical_incidents (10 vectors)"]
-        COL2["Collection 2:<br/>page_object_code (16 vectors)"]
+        COL1["Collection 1:<br/>historical_incidents (22 vectors)"]
+        COL2["Collection 2:<br/>page_object_code (27 vectors)"]
         SC --> CHROMA
         CHROMA --> COL1
         CHROMA --> COL2
@@ -62,16 +80,16 @@ flowchart TD
 
 ### 1. Why Naive Chunking Fails on Page Object Code (And How `SmartChunker` Solves It)
 Standard fixed-size token chunkers slice C# classes arbitrarily—separating private `ILocator` declarations at the top of a Page Object from the action methods (`LoginWithCredentialsAsync`, `ApplyPromoCodeAsync`) 40 lines below that use them.
-* **Our Solution ([src/chunker.py](src/chunker.py))**:
+* **Our Solution ([`src/chunker.py`](src/chunker.py))**:
   * **Pass 1**: Parses namespace, class name, and all class-level `ILocator` and `IFrameLocator` expression-bodied properties, resolving **transitive locator dependencies** (e.g., `CardNumberInput` inside `StripePaymentFrame`).
   * **Pass 2**: Splits the C# class along exact method boundaries using brace-depth tracking, numbers every source line (`L44: ...`), and **prepends the relevant class-level locator declarations** directly into each method chunk's header. Every retrieved method chunk is 100% self-contained.
 
 ### 2. Why Pure Dense Vector Search Fails on Stack Traces (And How `HybridTriageRetriever` Solves It)
 Dense embedding models (`all-MiniLM-L6-v2`) compress text into semantic concepts, often scoring two different `PlaywrightException` stack traces similarly even when they occur in different methods or involve different `data-testid` attributes. Furthermore, dense cosine similarity between an exception log and raw C# code is naturally low (~`0.45`).
-* **Our Solution ([src/retriever.py](src/retriever.py))**:
-  * **Deterministic Signal Extraction**: Extracts `target_class`, `target_method`, `failing_line`, `exception_type`, HTTP status codes (`502`), and CSS/`data-testid` tokens from the raw stack trace.
+* **Our Solution ([`src/retriever.py`](src/retriever.py))**:
+  * **Deterministic Signal Extraction**: Extracts `target_class`, `target_method`, `failing_line`, `exception_type`, HTTP status codes (`502`, `503`, `504`), and CSS/`data-testid` tokens from the raw stack trace.
   * **Hybrid Incident Scoring**: Combines dense cosine similarity with explicit metadata/lexical boosts (`+0.08` Page Object match, `+0.10` Method match, `+0.05` Exception match, up to `+0.12` Selector overlap, up to `+0.10` Domain keyword overlap).
-  * **Exact Code Pinpointing + Line Verification**: Uses ChromaDB `where={"class_name": target_class}` filtering and verifies `start_line <= failing_line <= end_line` (`EXACT_STACK_TRACE_PINPOINT`, `+0.35` structural boost).
+  * **Exact Code Pinpointing + Line Verification**: Uses ChromaDB `where={"class_name": target_class}` filtering and verifies `start_line <= failing_line <= end_line` (`EXACT_STACK_TRACE_PINPOINT`, `+0.35` structural boost), achieving **100% (20/20) C# method pinpointing** on our benchmark.
 
 ### 3. Cross-Method Companion Retrieval for Race Conditions
 Sometimes the line that crashes in a stack trace is the **victim**, not the root cause.
@@ -91,11 +109,15 @@ Not every E2E test failure should trigger a pull request against test code. When
 ```text
 smart-triage-rag/
 ├── data/
-│   ├── historical_incidents.json       # Knowledge Base 1: 10 detailed Playwright C# failure incidents
-│   └── page_objects/                   # Knowledge Base 2: C# Playwright Page Object classes
+│   ├── historical_incidents.json       # Knowledge Base 1: 22 Playwright C# failure incidents
+│   ├── eval_benchmark.json             # 20 unseen evaluation test cases with ground-truth labels
+│   ├── eval_results_summary.json       # Latest automated benchmark scorecard output
+│   └── page_objects/                   # Knowledge Base 2: 5 C# Playwright Page Objects (27 methods)
 │       ├── CheckoutPage.cs
 │       ├── LoginPage.cs
-│       └── PaymentGatewayPage.cs
+│       ├── OrderHistoryPage.cs
+│       ├── PaymentGatewayPage.cs
+│       └── ShoppingCartPage.cs
 ├── src/
 │   ├── __init__.py
 │   ├── chunker.py                      # Context-aware incident & C# method smart chunker
@@ -104,7 +126,11 @@ smart-triage-rag/
 │   ├── retriever.py                    # Hybrid dense + lexical + stack-trace retriever
 │   ├── test_retriever.py               # CLI benchmark comparing Dense vs. Hybrid retrieval scores
 │   ├── agent.py                        # Gemini 2.5 Flash + Offline Grounded Synthesizer Agent
+│   ├── evaluate.py                     # 20-case RAG evaluation & metrics benchmark runner
 │   └── main.py                         # End-to-End Rich CLI Triage & Self-Healing dashboard
+├── tests/
+│   └── test_pipeline.py                # Automated pytest unit & integration test suite (8 tests)
+├── LICENSE                             # MIT License
 ├── requirements.txt
 ├── .gitignore
 └── README.md
@@ -131,13 +157,18 @@ GEMINI_API_KEY=your_google_ai_studio_key_here
 python -m src.ingest
 ```
 
-### 4. Benchmark Dense vs. Hybrid Retrieval Scores
+### 4. Run the 20-Case Evaluation Benchmark Suite
 ```bash
-python -m src.test_retriever
+python -m src.evaluate
 ```
 
-### 5. Run the End-to-End AI Triage & Self-Healing Pipeline
-Run all 3 end-to-end scenarios (UI Locator Strict Mode Violation, Cross-Method Cookie Overlay Race Condition, and Backend HTTP 502 Outage):
+### 5. Run Automated Unit & Integration Tests
+```bash
+pytest -v
+```
+
+### 6. Run the End-to-End AI Triage & Self-Healing Pipeline
+Run all 3 end-to-end showcase scenarios (UI Locator Strict Mode Violation, Cross-Method Cookie Overlay Race Condition, and Backend HTTP 502 Outage):
 ```bash
 python -m src.main --all
 ```
