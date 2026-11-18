@@ -1,0 +1,92 @@
+[
+  {
+    "incident_id": "INC-2026-001",
+    "test_name": "SmartCommerce.E2E.Tests.AuthTests.StandardUser_LoginWithValidCredentials_ShouldRedirectToDashboard",
+    "error_message": "System.TimeoutException : Timeout 10000ms exceeded.\nCall log:\n  - waiting for Locator(\"button[data-testid='login-submit-btn']\")\n  -   locator resolved to <button type=\"submit\" class=\"btn-primary\" data-testid=\"auth-submit-btn\">Sign In</button>",
+    "stack_trace": "   at Microsoft.Playwright.Core.Waiter.WaitForPromiseAsync[T](Task`1 task, Action dispose) in /_/src/Playwright/Core/Waiter.cs:line 209\n   at Microsoft.Playwright.Core.Frame.ClickAsync(String selector, FrameClickOptions options) in /_/src/Playwright/Core/Frame.cs:line 312\n   at SmartCommerce.E2E.Pages.LoginPage.LoginWithCredentialsAsync(String email, String password) in C:\\repo\\SmartCommerce.E2E\\Pages\\LoginPage.cs:line 48\n   at SmartCommerce.E2E.Tests.AuthTests.StandardUser_LoginWithValidCredentials_ShouldRedirectToDashboard() in C:\\repo\\SmartCommerce.E2E\\Tests\\AuthTests.cs:line 34",
+    "category": "UI Locator Change",
+    "root_cause": "Frontend PR #4182 refactored the authentication form component to align with the new design system, renaming the submit button's `data-testid` attribute from `login-submit-btn` to `auth-submit-btn`.",
+    "resolution": "Updated `SignInButton` locator in `LoginPage.cs` (line 14) from `_page.Locator(\"button[data-testid='login-submit-btn']\")` to `_page.GetByTestId(\"auth-submit-btn\")`."
+  },
+  {
+    "incident_id": "INC-2026-002",
+    "test_name": "SmartCommerce.E2E.Tests.AuthTests.MfaUser_CompleteSixDigitTotpChallenge_ShouldAuthenticate",
+    "error_message": "Microsoft.Playwright.PlaywrightException : Error: strict mode violation: Locator(\"input.mfa-otp-digit-input\") resolved to 6 elements:\n    1) <input maxlength=\"1\" data-index=\"0\" class=\"mfa-otp-digit-input\" /> aka GetByRole(AriaRole.Textbox, new() { Name = \"Digit 1\" })\n    2) <input maxlength=\"1\" data-index=\"1\" class=\"mfa-otp-digit-input\" /> aka GetByRole(AriaRole.Textbox, new() { Name = \"Digit 2\" })\n    ...\nCall log:\n  - waiting for Locator(\"input.mfa-otp-digit-input\")",
+    "stack_trace": "   at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](ChannelOwner object, String method, Dictionary`2 dictionary, Boolean keepNulls) in /_/src/Playwright/Transport/Connection.cs:line 214\n   at Microsoft.Playwright.Core.Locator.FillAsync(String value, LocatorFillOptions options) in /_/src/Playwright/Core/Locator.cs:line 265\n   at SmartCommerce.E2E.Pages.LoginPage.CompleteMfaChallengeAsync(String sixDigitCode) in C:\\repo\\SmartCommerce.E2E\\Pages\\LoginPage.cs:line 54\n   at SmartCommerce.E2E.Tests.AuthTests.MfaUser_CompleteSixDigitTotpChallenge_ShouldAuthenticate() in C:\\repo\\SmartCommerce.E2E\\Tests\\AuthTests.cs:line 68",
+    "category": "UI Locator Change",
+    "root_cause": "The MFA UI component was replaced with a segmented 6-box OTP input where each digit has its own `<input class='mfa-otp-digit-input'>` element. Calling `MfaOtpDigits.FillAsync(sixDigitCode)` directly on the multi-element locator triggered a Playwright strict mode violation.",
+    "resolution": "Updated `CompleteMfaChallengeAsync` in `LoginPage.cs` to target `MfaOtpDigits.First` and use `PressSequentiallyAsync(sixDigitCode)` (or paste event) so the component auto-advances across all 6 inputs, or iterate via `Nth(i).FillAsync()`."
+  },
+  {
+    "incident_id": "INC-2026-003",
+    "test_name": "SmartCommerce.E2E.Tests.CheckoutTests.GuestCheckout_ApplySeasonalPromoCode_ShouldRecalculateSubtotal",
+    "error_message": "Microsoft.Playwright.PlaywrightException : Error: strict mode violation: GetByRole(AriaRole.Button, new() { Name = \"Apply\" }) resolved to 2 elements:\n    1) <button type=\"button\" data-testid=\"apply-promo-btn\">Apply</button> aka GetByTestId(\"apply-promo-btn\")\n    2) <button type=\"button\" data-testid=\"apply-loyalty-points-btn\">Apply Rewards</button> aka GetByTestId(\"apply-loyalty-points-btn\")",
+    "stack_trace": "   at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](ChannelOwner object, String method, Dictionary`2 dictionary, Boolean keepNulls) in /_/src/Playwright/Transport/Connection.cs:line 214\n   at Microsoft.Playwright.Core.Locator.ClickAsync(LocatorClickOptions options) in /_/src/Playwright/Core/Locator.cs:line 198\n   at SmartCommerce.E2E.Pages.CheckoutPage.ApplyPromoCodeAsync(String promoCode) in C:\\repo\\SmartCommerce.E2E\\Pages\\CheckoutPage.cs:line 50\n   at SmartCommerce.E2E.Tests.CheckoutTests.GuestCheckout_ApplySeasonalPromoCode_ShouldRecalculateSubtotal() in C:\\repo\\SmartCommerce.E2E\\Tests\\CheckoutTests.cs:line 89",
+    "category": "UI Locator Change",
+    "root_cause": "A new 'Apply Rewards' button was introduced on the Checkout page. Because `GetByRole(AriaRole.Button, new() { Name = \"Apply\" })` uses substring matching by default (`Exact = false`), it matched both 'Apply' and 'Apply Rewards', violating Playwright strict mode.",
+    "resolution": "Updated `ApplyPromoButton` in `CheckoutPage.cs` (line 18) to set `Exact = true`: `_page.GetByRole(AriaRole.Button, new() { Name = \"Apply\", Exact = true })` or use `_page.GetByTestId(\"apply-promo-btn\")`."
+  },
+  {
+    "incident_id": "INC-2026-004",
+    "test_name": "SmartCommerce.E2E.Tests.CheckoutTests.ExpressCheckout_ReserveHighDemandItem_ShouldAdvanceToPayment",
+    "error_message": "Microsoft.Playwright.PlaywrightException : Inventory reservation API failed with HTTP 502: Bad Gateway",
+    "stack_trace": "   at SmartCommerce.E2E.Pages.CheckoutPage.ProceedToPaymentStepAsync() in C:\\repo\\SmartCommerce.E2E\\Pages\\CheckoutPage.cs:line 69\n   at SmartCommerce.E2E.Tests.CheckoutTests.ExpressCheckout_ReserveHighDemandItem_ShouldAdvanceToPayment() in C:\\repo\\SmartCommerce.E2E\\Tests\\CheckoutTests.cs:line 115",
+    "category": "Backend API Timeout",
+    "root_cause": "The downstream `inventory-reservation-service` pods in the QA Kubernetes cluster restarted during an automated Helm deployment while holding open Redis distributed locks, causing NGINX ingress to return HTTP 502 Bad Gateway on `POST /api/v2/inventory/reserve`.",
+    "resolution": "Configured readiness/liveness probe grace periods on `inventory-reservation-service` in QA and added exponential backoff retry policy in the API Gateway for transient 502/503 upstream errors."
+  },
+  {
+    "incident_id": "INC-2026-005",
+    "test_name": "SmartCommerce.E2E.Tests.CheckoutTests.AddressEntry_SelectGooglePlacesAutocomplete_ShouldPopulatePostalCode",
+    "error_message": "System.TimeoutException : Timeout 8000ms exceeded.\nCall log:\n  - waiting for Locator(\"ul.pac-container li.pac-item\").First\n  -   locator resolved to hidden <li class=\"pac-item\">...</li>",
+    "stack_trace": "   at Microsoft.Playwright.Core.Waiter.WaitForPromiseAsync[T](Task`1 task, Action dispose) in /_/src/Playwright/Core/Waiter.cs:line 209\n   at Microsoft.Playwright.Core.Locator.ClickAsync(LocatorClickOptions options) in /_/src/Playwright/Core/Locator.cs:line 198\n   at SmartCommerce.E2E.Pages.CheckoutPage.FillShippingAddressAsync(String firstName, String lastName, String streetQuery, String postalCode) in C:\\repo\\SmartCommerce.E2E\\Pages\\CheckoutPage.cs:line 34\n   at SmartCommerce.E2E.Tests.CheckoutTests.AddressEntry_SelectGooglePlacesAutocomplete_ShouldPopulatePostalCode() in C:\\repo\\SmartCommerce.E2E\\Tests\\CheckoutTests.cs:line 52",
+    "category": "Race Condition / Missing Wait",
+    "root_cause": "`AddressAutocompleteInput.FillAsync(streetQuery)` sets the input value instantaneously without firing incremental `keydown`/`input` events that the debounced address autocomplete listener expects, leaving the suggestion dropdown hidden.",
+    "resolution": "Replaced `FillAsync(streetQuery)` with `PressSequentiallyAsync(streetQuery, new() { Delay = 75 })` in `CheckoutPage.cs` (line 33) and explicitly waited for the `/api/v2/address/autocomplete` network response before clicking `AddressSuggestionItems.First`."
+  },
+  {
+    "incident_id": "INC-2026-006",
+    "test_name": "SmartCommerce.E2E.Tests.PaymentTests.CreditCardPayment_StripeElementsIframe_ShouldAcceptValidVisaCard",
+    "error_message": "System.TimeoutException : Timeout 15000ms exceeded.\nCall log:\n  - waiting for FrameLocator(\"iframe[name^='__privateStripeFrame']\").Locator(\"input[name='cardnumber']\") to be visible",
+    "stack_trace": "   at Microsoft.Playwright.Core.Waiter.WaitForPromiseAsync[T](Task`1 task, Action dispose) in /_/src/Playwright/Core/Waiter.cs:line 209\n   at Microsoft.Playwright.Core.Locator.WaitForAsync(LocatorWaitForOptions options) in /_/src/Playwright/Core/Locator.cs:line 510\n   at SmartCommerce.E2E.Pages.PaymentGatewayPage.EnterCreditCardDetailsAsync(String cardNumber, String expiry, String cvc) in C:\\repo\\SmartCommerce.E2E\\Pages\\PaymentGatewayPage.cs:line 28\n   at SmartCommerce.E2E.Tests.PaymentTests.CreditCardPayment_StripeElementsIframe_ShouldAcceptValidVisaCard() in C:\\repo\\SmartCommerce.E2E\\Tests\\PaymentTests.cs:line 44",
+    "category": "UI Locator Change",
+    "root_cause": "Payment integration migrated from legacy Stripe Card Element (which injected `input[name='cardnumber']`) to the unified Stripe Payment Element iframe, where the card number input now uses `input#Field-numberInput` inside an iframe titled `Secure payment input frame`.",
+    "resolution": "Updated `StripePaymentFrame` in `PaymentGatewayPage.cs` (line 12) to `_page.FrameLocator(\"iframe[title='Secure payment input frame']\")` and updated `CardNumberInput` to `StripePaymentFrame.Locator(\"input#Field-numberInput\")`."
+  },
+  {
+    "incident_id": "INC-2026-007",
+    "test_name": "SmartCommerce.E2E.Tests.PaymentTests.ThreeDSecureCard_CompleteChallenge_ShouldRedirectToConfirmation",
+    "error_message": "Microsoft.Playwright.TargetClosedException : Target page, context or browser has been closed\nCall log:\n  - waiting for FrameLocator(\"iframe#threeds-challenge-iframe\").GetByRole(AriaRole.Button, new() { Name = \"Complete Authentication\" })",
+    "stack_trace": "   at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](ChannelOwner object, String method, Dictionary`2 dictionary, Boolean keepNulls) in /_/src/Playwright/Transport/Connection.cs:line 214\n   at Microsoft.Playwright.Core.Locator.ClickAsync(LocatorClickOptions options) in /_/src/Playwright/Core/Locator.cs:line 198\n   at SmartCommerce.E2E.Pages.PaymentGatewayPage.SubmitPaymentAndHandle3DSAsync(Boolean expect3DSChallenge) in C:\\repo\\SmartCommerce.E2E\\Pages\\PaymentGatewayPage.cs:line 49\n   at SmartCommerce.E2E.Tests.PaymentTests.ThreeDSecureCard_CompleteChallenge_ShouldRedirectToConfirmation() in C:\\repo\\SmartCommerce.E2E\\Tests\\PaymentTests.cs:line 77",
+    "category": "Race Condition / Missing Wait",
+    "root_cause": "In `SubmitPaymentAndHandle3DSAsync`, clicking `SubmitOrderButton` triggers an asynchronous `/api/v2/payments/intent` call that dynamically mounts and re-mounts the 3DS challenge iframe when transitioning from 3DS Method fingerprinting to Challenge flow. Clicking `ThreeDSecureApproveBtn` before the iframe finished its second navigation caused the frame target to detach mid-click.",
+    "resolution": "Added an explicit wait for the `/3ds2/challenge` response inside the frame (`WaitForLoadStateAsync(LoadState.DOMContentLoaded)`) before interacting with `ThreeDSecureApproveBtn` in `PaymentGatewayPage.cs`."
+  },
+  {
+    "incident_id": "INC-2026-008",
+    "test_name": "SmartCommerce.E2E.Tests.PaymentTests.InstantCharge_HighConcurrencyCheckout_ShouldProcessPaymentWithinSla",
+    "error_message": "System.TimeoutException : Timeout 25000ms exceeded while waiting for event \"Response\"\n=========================== logs ===========================\nwaiting for response https://qa.smartcommerce.internal/api/v2/payments/charge\n============================================================",
+    "stack_trace": "   at Microsoft.Playwright.Core.Waiter.WaitForPromiseAsync[T](Task`1 task, Action dispose) in /_/src/Playwright/Core/Waiter.cs:line 209\n   at Microsoft.Playwright.Core.Page.WaitForResponseAsync(Func`2 predicate, PageWaitForResponseOptions options) in /_/src/Playwright/Core/Page.cs:line 842\n   at SmartCommerce.E2E.Pages.PaymentGatewayPage.SubmitInstantPaymentAsync() in C:\\repo\\SmartCommerce.E2E\\Pages\\PaymentGatewayPage.cs:line 66\n   at SmartCommerce.E2E.Tests.PaymentTests.InstantCharge_HighConcurrencyCheckout_ShouldProcessPaymentWithinSla() in C:\\repo\\SmartCommerce.E2E\\Tests\\PaymentTests.cs:line 112",
+    "category": "Backend API Timeout",
+    "root_cause": "The sandbox payment processor simulator (`mock-acquirer-service`) experienced connection pool exhaustion on PostgreSQL (`max_connections=100` reached during parallel CI test execution), causing `/api/v2/payments/charge` requests to hang beyond 25 seconds.",
+    "resolution": "Deployed PgBouncer transaction pooling in front of the QA PostgreSQL instance and reduced parallel Playwright worker count for payment-heavy test shards from 16 to 8."
+  },
+  {
+    "incident_id": "INC-2026-009",
+    "test_name": "SmartCommerce.E2E.Tests.AuthTests.EnterpriseUser_SsoPopupFlow_ShouldExchangeSamlAssertion",
+    "error_message": "Microsoft.Playwright.PlaywrightException : Locator.ClickAsync: Element is not visible - waiting for Locator(\"button[data-testid='login-submit-btn']\") to be clickable, but element is obscured by <div id=\"onetrust-consent-sdk\" class=\"onetrust-pc-dark-filter\"></div>",
+    "stack_trace": "   at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](ChannelOwner object, String method, Dictionary`2 dictionary, Boolean keepNulls) in /_/src/Playwright/Transport/Connection.cs:line 214\n   at Microsoft.Playwright.Core.Locator.ClickAsync(LocatorClickOptions options) in /_/src/Playwright/Core/Locator.cs:line 198\n   at SmartCommerce.E2E.Pages.LoginPage.LoginWithCredentialsAsync(String email, String password) in C:\\repo\\SmartCommerce.E2E\\Pages\\LoginPage.cs:line 48\n   at SmartCommerce.E2E.Tests.AuthTests.EnterpriseUser_SsoPopupFlow_ShouldExchangeSamlAssertion() in C:\\repo\\SmartCommerce.E2E\\Tests\\AuthTests.cs:line 95",
+    "category": "Race Condition / Missing Wait",
+    "root_cause": "`DismissCookieBannerIfPresentAsync()` used `CookieConsentAcceptBtn.IsVisibleAsync()`, which returns `false` immediately without waiting when the third-party OneTrust script loads asynchronously 600ms after `DOMContentLoaded`. The banner then appeared right as `SignInButton.ClickAsync()` executed, intercepting pointer events.",
+    "resolution": "Replaced the racy `IsVisibleAsync()` check in `LoginPage.cs` (line 38) with `await _page.AddLocatorHandlerAsync(CookieConsentAcceptBtn, async btn => await btn.ClickAsync())` so Playwright automatically dismisses the overlay whenever it blocks an action."
+  },
+  {
+    "incident_id": "INC-2026-010",
+    "test_name": "SmartCommerce.E2E.Tests.CheckoutTests.RegisteredUser_SelectExpressShipping_ShouldUpdateOrderTotal",
+    "error_message": "Microsoft.Playwright.PlaywrightException : Expect(Locator).ToBeVisibleAsync() failed\nLocator: GetByTestId(\"navbar-user-avatar\")\nExpected: visible\nReceived: <element(s) not found>\nCall log:\n  - Expect \"ToBeVisibleAsync\" with timeout 15000ms\n  - waiting for GetByTestId(\"navbar-user-avatar\")",
+    "stack_trace": "   at Microsoft.Playwright.Core.AssertionsBase.ExpectImplAsync(String expression, FrameExpectOptions expectOptions, Object expected, String message) in /_/src/Playwright/Core/AssertionsBase.cs:line 98\n   at SmartCommerce.E2E.Pages.LoginPage.AssertAuthenticatedSessionAsync() in C:\\repo\\SmartCommerce.E2E\\Pages\\LoginPage.cs:line 69\n   at SmartCommerce.E2E.Tests.CheckoutTests.SetUpAuthenticatedUserAsync() in C:\\repo\\SmartCommerce.E2E\\Tests\\CheckoutTests.cs:line 27\n   at SmartCommerce.E2E.Tests.CheckoutTests.RegisteredUser_SelectExpressShipping_ShouldUpdateOrderTotal() in C:\\repo\\SmartCommerce.E2E\\Tests\\CheckoutTests.cs:line 64",
+    "category": "Test Data / Environment Issue",
+    "root_cause": "The shared QA seed account (`qa-checkout-user@smartcommerce.internal`) had its password expired by the nightly Active Directory compliance job, causing login to stay on `/auth/login` with an 'Account Password Expired' alert instead of redirecting to the authenticated navbar.",
+    "resolution": "Exempted `qa-*-user@smartcommerce.internal` service accounts from the 90-day AD password expiration policy and updated the test fixture to provision ephemeral test users via `/api/v2/test-harness/seed-user` before each test run."
+  }
+]
