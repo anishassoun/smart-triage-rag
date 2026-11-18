@@ -99,6 +99,21 @@ class HybridTriageRetriever:
         "promo",
         "expired",
         "avatar",
+        "popup",
+        "shipping-rates",
+        "504",
+        "503",
+        "502",
+        "confirmation-heading",
+        "cart-line-item-row",
+        "qty-stepper",
+        "upsell",
+        "quick-add",
+        "download",
+        "rmareasoncode",
+        "carrier-webhook",
+        "order-history-card",
+        "paypal",
     ]
 
     def __init__(self, vector_store: Optional[TriageVectorStore] = None) -> None:

@@ -15,7 +15,7 @@
     "stack_trace": "   at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](ChannelOwner object, String method, Dictionary`2 dictionary, Boolean keepNulls) in /_/src/Playwright/Transport/Connection.cs:line 214\n   at Microsoft.Playwright.Core.Locator.FillAsync(String value, LocatorFillOptions options) in /_/src/Playwright/Core/Locator.cs:line 265\n   at SmartCommerce.E2E.Pages.LoginPage.CompleteMfaChallengeAsync(String sixDigitCode) in C:\\repo\\SmartCommerce.E2E\\Pages\\LoginPage.cs:line 54\n   at SmartCommerce.E2E.Tests.AuthTests.MfaUser_CompleteSixDigitTotpChallenge_ShouldAuthenticate() in C:\\repo\\SmartCommerce.E2E\\Tests\\AuthTests.cs:line 68",
     "category": "UI Locator Change",
     "root_cause": "The MFA UI component was replaced with a segmented 6-box OTP input where each digit has its own `<input class='mfa-otp-digit-input'>` element. Calling `MfaOtpDigits.FillAsync(sixDigitCode)` directly on the multi-element locator triggered a Playwright strict mode violation.",
-    "resolution": "Updated `CompleteMfaChallengeAsync` in `LoginPage.cs` to target `MfaOtpDigits.First` and use `PressSequentiallyAsync(sixDigitCode)` (or paste event) so the component auto-advances across all 6 inputs, or iterate via `Nth(i).FillAsync()`."
+    "resolution": "Updated `CompleteMfaChallengeAsync` in `LoginPage.cs` to target `MfaOtpDigits.First` and use `PressSequentiallyAsync(sixDigitCode)` so the component auto-advances across all 6 inputs."
   },
   {
     "incident_id": "INC-2026-003",
@@ -24,7 +24,7 @@
     "stack_trace": "   at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](ChannelOwner object, String method, Dictionary`2 dictionary, Boolean keepNulls) in /_/src/Playwright/Transport/Connection.cs:line 214\n   at Microsoft.Playwright.Core.Locator.ClickAsync(LocatorClickOptions options) in /_/src/Playwright/Core/Locator.cs:line 198\n   at SmartCommerce.E2E.Pages.CheckoutPage.ApplyPromoCodeAsync(String promoCode) in C:\\repo\\SmartCommerce.E2E\\Pages\\CheckoutPage.cs:line 50\n   at SmartCommerce.E2E.Tests.CheckoutTests.GuestCheckout_ApplySeasonalPromoCode_ShouldRecalculateSubtotal() in C:\\repo\\SmartCommerce.E2E\\Tests\\CheckoutTests.cs:line 89",
     "category": "UI Locator Change",
     "root_cause": "A new 'Apply Rewards' button was introduced on the Checkout page. Because `GetByRole(AriaRole.Button, new() { Name = \"Apply\" })` uses substring matching by default (`Exact = false`), it matched both 'Apply' and 'Apply Rewards', violating Playwright strict mode.",
-    "resolution": "Updated `ApplyPromoButton` in `CheckoutPage.cs` (line 18) to set `Exact = true`: `_page.GetByRole(AriaRole.Button, new() { Name = \"Apply\", Exact = true })` or use `_page.GetByTestId(\"apply-promo-btn\")`."
+    "resolution": "Updated `ApplyPromoButton` in `CheckoutPage.cs` (line 19) to set `Exact = true`: `_page.GetByRole(AriaRole.Button, new() { Name = \"Apply\", Exact = true })` or use `_page.GetByTestId(\"apply-promo-btn\")`."
   },
   {
     "incident_id": "INC-2026-004",
@@ -42,7 +42,7 @@
     "stack_trace": "   at Microsoft.Playwright.Core.Waiter.WaitForPromiseAsync[T](Task`1 task, Action dispose) in /_/src/Playwright/Core/Waiter.cs:line 209\n   at Microsoft.Playwright.Core.Locator.ClickAsync(LocatorClickOptions options) in /_/src/Playwright/Core/Locator.cs:line 198\n   at SmartCommerce.E2E.Pages.CheckoutPage.FillShippingAddressAsync(String firstName, String lastName, String streetQuery, String postalCode) in C:\\repo\\SmartCommerce.E2E\\Pages\\CheckoutPage.cs:line 34\n   at SmartCommerce.E2E.Tests.CheckoutTests.AddressEntry_SelectGooglePlacesAutocomplete_ShouldPopulatePostalCode() in C:\\repo\\SmartCommerce.E2E\\Tests\\CheckoutTests.cs:line 52",
     "category": "Race Condition / Missing Wait",
     "root_cause": "`AddressAutocompleteInput.FillAsync(streetQuery)` sets the input value instantaneously without firing incremental `keydown`/`input` events that the debounced address autocomplete listener expects, leaving the suggestion dropdown hidden.",
-    "resolution": "Replaced `FillAsync(streetQuery)` with `PressSequentiallyAsync(streetQuery, new() { Delay = 75 })` in `CheckoutPage.cs` (line 33) and explicitly waited for the `/api/v2/address/autocomplete` network response before clicking `AddressSuggestionItems.First`."
+    "resolution": "Replaced `FillAsync(streetQuery)` with `PressSequentiallyAsync(streetQuery, new() { Delay = 75 })` in `CheckoutPage.cs` (line 34) and explicitly waited for the `/api/v2/address/autocomplete` network response before clicking `AddressSuggestionItems.First`."
   },
   {
     "incident_id": "INC-2026-006",
@@ -88,5 +88,113 @@
     "category": "Test Data / Environment Issue",
     "root_cause": "The shared QA seed account (`qa-checkout-user@smartcommerce.internal`) had its password expired by the nightly Active Directory compliance job, causing login to stay on `/auth/login` with an 'Account Password Expired' alert instead of redirecting to the authenticated navbar.",
     "resolution": "Exempted `qa-*-user@smartcommerce.internal` service accounts from the 90-day AD password expiration policy and updated the test fixture to provision ephemeral test users via `/api/v2/test-harness/seed-user` before each test run."
+  },
+  {
+    "incident_id": "INC-2026-011",
+    "test_name": "SmartCommerce.E2E.Tests.AuthTests.CorporateUser_InitiateOktaSsoPopup_ShouldCompleteFederation",
+    "error_message": "System.TimeoutException : Timeout 30000ms exceeded while waiting for event \"Popup\"\n=========================== logs ===========================\nwaiting for event \"Popup\"\n============================================================",
+    "stack_trace": "   at Microsoft.Playwright.Core.Waiter.WaitForPromiseAsync[T](Task`1 task, Action dispose) in /_/src/Playwright/Core/Waiter.cs:line 209\n   at SmartCommerce.E2E.Pages.LoginPage.InitiateSsoLoginAsync(String idpDomain) in C:\\repo\\SmartCommerce.E2E\\Pages\\LoginPage.cs:line 63\n   at SmartCommerce.E2E.Tests.AuthTests.CorporateUser_InitiateOktaSsoPopup_ShouldCompleteFederation() in C:\\repo\\SmartCommerce.E2E\\Tests\\AuthTests.cs:line 118",
+    "category": "Test Data / Environment Issue",
+    "root_cause": "The QA Okta SAML Identity Provider tenant (`idp-sandbox.smartcommerce.internal`) had an expired TLS certificate, causing the preflight `/api/v2/auth/sso-lookup` check to return 400 and preventing `window.open()` from launching the SSO popup window.",
+    "resolution": "Renewed the Let's Encrypt wildcard certificate on `idp-sandbox.smartcommerce.internal` via cert-manager in the QA cluster."
+  },
+  {
+    "incident_id": "INC-2026-012",
+    "test_name": "SmartCommerce.E2E.Tests.CheckoutTests.InternationalOrder_SelectDhlExpressShipping_ShouldUpdateGrandTotal",
+    "error_message": "System.TimeoutException : Timeout 30000ms exceeded while waiting for event \"Response\"\n=========================== logs ===========================\nwaiting for response https://qa.smartcommerce.internal/api/v2/checkout/shipping-rates (status 200)\nreceived response with status 504 Gateway Timeout\n============================================================",
+    "stack_trace": "   at Microsoft.Playwright.Core.Waiter.WaitForPromiseAsync[T](Task`1 task, Action dispose) in /_/src/Playwright/Core/Waiter.cs:line 209\n   at SmartCommerce.E2E.Pages.CheckoutPage.SelectShippingTierAsync(String tierCode) in C:\\repo\\SmartCommerce.E2E\\Pages\\CheckoutPage.cs:line 43\n   at SmartCommerce.E2E.Tests.CheckoutTests.InternationalOrder_SelectDhlExpressShipping_ShouldUpdateGrandTotal() in C:\\repo\\SmartCommerce.E2E\\Tests\\CheckoutTests.cs:line 142",
+    "category": "Backend API Timeout",
+    "root_cause": "The external DHL sandbox rate-calculation webhook timed out in the QA environment, causing `/api/v2/checkout/shipping-rates` to return HTTP 504 Gateway Timeout instead of HTTP 200.",
+    "resolution": "Enabled WireMock fallback stubs for third-party carrier rate calculation endpoints (`/api/v2/checkout/shipping-rates`) in the QA environment."
+  },
+  {
+    "incident_id": "INC-2026-013",
+    "test_name": "SmartCommerce.E2E.Tests.PaymentTests.DigitalWalletCheckout_VerifyConfirmationHeader_ShouldDisplayOrderNumber",
+    "error_message": "Microsoft.Playwright.PlaywrightException : Expect(Locator).ToContainTextAsync() failed\nLocator: GetByTestId(\"order-confirmation-heading\")\nExpected substring: \"Thank you for your order\"\nReceived: <element(s) not found>\nCall log:\n  - Expect \"ToContainTextAsync\" with timeout 10000ms\n  - waiting for GetByTestId(\"order-confirmation-heading\")",
+    "stack_trace": "   at Microsoft.Playwright.Core.AssertionsBase.ExpectImplAsync(String expression, FrameExpectOptions expectOptions, Object expected, String message) in /_/src/Playwright/Core/AssertionsBase.cs:line 98\n   at SmartCommerce.E2E.Pages.PaymentGatewayPage.AssertOrderConfirmedAsync() in C:\\repo\\SmartCommerce.E2E\\Pages\\PaymentGatewayPage.cs:line 77\n   at SmartCommerce.E2E.Tests.PaymentTests.DigitalWalletCheckout_VerifyConfirmationHeader_ShouldDisplayOrderNumber() in C:\\repo\\SmartCommerce.E2E\\Tests\\PaymentTests.cs:line 136",
+    "category": "UI Locator Change",
+    "root_cause": "The post-purchase confirmation React page refactored the hero heading attribute from `data-testid='order-confirmation-heading'` to `data-testid='checkout-success-hero-title'`.",
+    "resolution": "Updated `OrderConfirmationHeader` locator in `PaymentGatewayPage.cs` (line 18) from `_page.GetByTestId(\"order-confirmation-heading\")` to `_page.GetByTestId(\"checkout-success-hero-title\")`."
+  },
+  {
+    "incident_id": "INC-2026-014",
+    "test_name": "SmartCommerce.E2E.Tests.CartTests.SlideoutCart_RemoveSingleLineItem_ShouldHideRowFromDrawer",
+    "error_message": "Microsoft.Playwright.PlaywrightException : Expect(Locator).ToBeHiddenAsync() failed\nLocator: Locator(\"div[data-testid='cart-line-item-row']\").Filter(new() { HasText = \"Wireless ANC Headphones\" })\nExpected: hidden\nReceived: visible\nCall log:\n  - Expect \"ToBeHiddenAsync\" with timeout 8000ms",
+    "stack_trace": "   at Microsoft.Playwright.Core.AssertionsBase.ExpectImplAsync(String expression, FrameExpectOptions expectOptions, Object expected, String message) in /_/src/Playwright/Core/AssertionsBase.cs:line 98\n   at SmartCommerce.E2E.Pages.ShoppingCartPage.RemoveLineItemAsync(String productName) in C:\\repo\\SmartCommerce.E2E\\Pages\\ShoppingCartPage.cs:line 55\n   at SmartCommerce.E2E.Tests.CartTests.SlideoutCart_RemoveSingleLineItem_ShouldHideRowFromDrawer() in C:\\repo\\SmartCommerce.E2E\\Tests\\CartTests.cs:line 49",
+    "category": "UI Locator Change",
+    "root_cause": "UX added a confirmation modal (`data-testid='confirm-remove-item-modal-btn'`) when clicking 'Remove item' in the cart drawer. `RemoveLineItemAsync` only clicked the trash icon without confirming the modal, so the line item remained visible.",
+    "resolution": "Updated `RemoveLineItemAsync` in `ShoppingCartPage.cs` (line 54) to click `RemoveConfirmModalBtn` (`_page.GetByTestId(\"confirm-remove-item-modal-btn\")`) before asserting `ToBeHiddenAsync()`."
+  },
+  {
+    "incident_id": "INC-2026-015",
+    "test_name": "SmartCommerce.E2E.Tests.CartTests.SlideoutCart_IncrementBundleSkuQuantity_ShouldRecalculateSubtotal",
+    "error_message": "System.TimeoutException : Timeout 12000ms exceeded while waiting for event \"Response\"\n=========================== logs ===========================\nwaiting for response https://qa.smartcommerce.internal/api/v2/cart/items\n============================================================",
+    "stack_trace": "   at Microsoft.Playwright.Core.Waiter.WaitForPromiseAsync[T](Task`1 task, Action dispose) in /_/src/Playwright/Core/Waiter.cs:line 209\n   at SmartCommerce.E2E.Pages.ShoppingCartPage.IncrementItemQuantityAsync(String skuCode, Int32 clicks) in C:\\repo\\SmartCommerce.E2E\\Pages\\ShoppingCartPage.cs:line 46\n   at SmartCommerce.E2E.Tests.CartTests.SlideoutCart_IncrementBundleSkuQuantity_ShouldRecalculateSubtotal() in C:\\repo\\SmartCommerce.E2E\\Tests\\CartTests.cs:line 73",
+    "category": "Race Condition / Missing Wait",
+    "root_cause": "In `IncrementItemQuantityAsync`, rapid sequential loop clicks on `plusButton` triggered frontend request cancellation (AbortController) on `/api/v2/cart/items` because the quantity stepper debounces API calls by 400ms and disables the button while a PATCH request is in flight.",
+    "resolution": "Updated `IncrementItemQuantityAsync` in `ShoppingCartPage.cs` (line 45) to wait for `Assertions.Expect(plusButton).ToBeEnabledAsync()` before each click iteration."
+  },
+  {
+    "incident_id": "INC-2026-016",
+    "test_name": "SmartCommerce.E2E.Tests.CartTests.SlideoutCart_ClickCheckoutButton_ShouldNavigateToShippingStep",
+    "error_message": "Microsoft.Playwright.PlaywrightException : Error: strict mode violation: GetByRole(AriaRole.Button, new() { Name = \"Checkout\" }) resolved to 2 elements:\n    1) <button data-testid=\"drawer-primary-checkout-btn\">Proceed to Checkout</button>\n    2) <button data-testid=\"drawer-express-paypal-checkout-btn\">PayPal Express Checkout</button>",
+    "stack_trace": "   at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](ChannelOwner object, String method, Dictionary`2 dictionary, Boolean keepNulls) in /_/src/Playwright/Transport/Connection.cs:line 214\n   at Microsoft.Playwright.Core.Locator.ClickAsync(LocatorClickOptions options) in /_/src/Playwright/Core/Locator.cs:line 198\n   at SmartCommerce.E2E.Pages.ShoppingCartPage.NavigateToCheckoutFromDrawerAsync() in C:\\repo\\SmartCommerce.E2E\\Pages\\ShoppingCartPage.cs:line 70\n   at SmartCommerce.E2E.Tests.CartTests.SlideoutCart_ClickCheckoutButton_ShouldNavigateToShippingStep() in C:\\repo\\SmartCommerce.E2E\\Tests\\CartTests.cs:line 98",
+    "category": "UI Locator Change",
+    "root_cause": "Adding the 'PayPal Express Checkout' button inside the slideout cart caused `GetByRole(AriaRole.Button, new() { Name = \"Checkout\" })` to match both 'Proceed to Checkout' and 'PayPal Express Checkout' under Playwright strict mode.",
+    "resolution": "Updated `ProceedToCheckoutBtn` in `ShoppingCartPage.cs` (line 20) to use `_page.GetByTestId(\"drawer-primary-checkout-btn\")`."
+  },
+  {
+    "incident_id": "INC-2026-017",
+    "test_name": "SmartCommerce.E2E.Tests.CartTests.SlideoutCart_AddUpsellCarouselItem_ShouldAppendToCartItems",
+    "error_message": "System.TimeoutException : Timeout 10000ms exceeded.\nCall log:\n  - waiting for Locator(\"section.cart-upsell-widget button[data-action='quick-add']\").First\n  -   locator resolved to <button disabled data-action=\"quick-add\">Adding...</button>\n  - attempting click action\n  -   waiting for element to be visible, enabled and stable",
+    "stack_trace": "   at Microsoft.Playwright.Core.Waiter.WaitForPromiseAsync[T](Task`1 task, Action dispose) in /_/src/Playwright/Core/Waiter.cs:line 209\n   at Microsoft.Playwright.Core.Locator.ClickAsync(LocatorClickOptions options) in /_/src/Playwright/Core/Locator.cs:line 198\n   at SmartCommerce.E2E.Pages.ShoppingCartPage.AddRecommendedUpsellItemAsync(Int32 index) in C:\\repo\\SmartCommerce.E2E\\Pages\\ShoppingCartPage.cs:line 64\n   at SmartCommerce.E2E.Tests.CartTests.SlideoutCart_AddUpsellCarouselItem_ShouldAppendToCartItems() in C:\\repo\\SmartCommerce.E2E\\Tests\\CartTests.cs:line 121",
+    "category": "Race Condition / Missing Wait",
+    "root_cause": "`AddRecommendedUpsellItemAsync` attempted to click the upsell quick-add button while the asynchronous personalization widget was still hydrating inventory availability from `/api/v2/recommendations/cart-upsell`, leaving the button in a disabled skeleton state.",
+    "resolution": "Added `await Assertions.Expect(quickAddBtn).ToBeEnabledAsync(new() { Timeout = 10000 })` after waiting for `/api/v2/recommendations/cart-upsell` in `ShoppingCartPage.cs` (line 63)."
+  },
+  {
+    "incident_id": "INC-2026-018",
+    "test_name": "SmartCommerce.E2E.Tests.OrderHistoryTests.CustomerPortal_FilterOrdersByLastSixMonths_ShouldRenderOrderCards",
+    "error_message": "Microsoft.Playwright.PlaywrightException : Orders History GraphQL/REST endpoint failed with HTTP 503",
+    "stack_trace": "   at SmartCommerce.E2E.Pages.OrderHistoryPage.FilterOrdersByTimeframeAsync(String timeframeOptionValue) in C:\\repo\\SmartCommerce.E2E\\Pages\\OrderHistoryPage.cs:line 36\n   at SmartCommerce.E2E.Tests.OrderHistoryTests.CustomerPortal_FilterOrdersByLastSixMonths_ShouldRenderOrderCards() in C:\\repo\\SmartCommerce.E2E\\Tests\\OrderHistoryTests.cs:line 41",
+    "category": "Backend API Timeout",
+    "root_cause": "The `order-ledger-read-replica` Elasticsearch cluster in QA was undergoing an index shard rebalance, causing `/api/v2/orders/history` queries to fail with HTTP 503 Service Unavailable.",
+    "resolution": "Increased Elasticsearch replica count in QA and configured circuit-breaker fallback to read from PostgreSQL read-replica when search index shards are rebalancing."
+  },
+  {
+    "incident_id": "INC-2026-019",
+    "test_name": "SmartCommerce.E2E.Tests.OrderHistoryTests.CompletedOrder_DownloadVatInvoicePdf_ShouldSaveNonEmptyPdf",
+    "error_message": "System.TimeoutException : Timeout 20000ms exceeded while waiting for event \"Download\"\n=========================== logs ===========================\nwaiting for download...\n============================================================",
+    "stack_trace": "   at Microsoft.Playwright.Core.Waiter.WaitForPromiseAsync[T](Task`1 task, Action dispose) in /_/src/Playwright/Core/Waiter.cs:line 209\n   at SmartCommerce.E2E.Pages.OrderHistoryPage.DownloadTaxInvoicePdfAsync(String orderId) in C:\\repo\\SmartCommerce.E2E\\Pages\\OrderHistoryPage.cs:line 54\n   at SmartCommerce.E2E.Tests.OrderHistoryTests.CompletedOrder_DownloadVatInvoicePdf_ShouldSaveNonEmptyPdf() in C:\\repo\\SmartCommerce.E2E\\Tests\\OrderHistoryTests.cs:line 67",
+    "category": "UI Locator Change",
+    "root_cause": "The invoice link (`a[data-testid='download-tax-invoice-btn']`) was changed from a direct `<a download>` anchor to a button that opens the PDF in a new browser tab (`target='_blank'`) without a `Content-Disposition: attachment` header, so Playwright's `WaitForDownloadAsync` never fired.",
+    "resolution": "Updated `DownloadTaxInvoicePdfAsync` in `OrderHistoryPage.cs` (line 52) to use `_page.WaitForPopupAsync()` or intercept `/api/v2/orders/*/invoice.pdf` response bytes instead of `WaitForDownloadAsync`."
+  },
+  {
+    "incident_id": "INC-2026-020",
+    "test_name": "SmartCommerce.E2E.Tests.OrderHistoryTests.DeliveredOrder_SubmitDefectiveItemReturn_ShouldGenerateRmaLabel",
+    "error_message": "System.TimeoutException : Timeout 30000ms exceeded.\nCall log:\n  - waiting for Locator(\"input[name='rmaReasonCode']\").Filter(new() { HasText = \"DEFECTIVE_ITEM\" })\n  -   locator resolved to 0 elements",
+    "stack_trace": "   at Microsoft.Playwright.Core.Waiter.WaitForPromiseAsync[T](Task`1 task, Action dispose) in /_/src/Playwright/Core/Waiter.cs:line 209\n   at Microsoft.Playwright.Core.Locator.CheckAsync(LocatorCheckOptions options) in /_/src/Playwright/Core/Locator.cs:line 145\n   at SmartCommerce.E2E.Pages.OrderHistoryPage.SubmitReturnMerchandiseAuthorizationAsync(String orderId, String reasonValue) in C:\\repo\\SmartCommerce.E2E\\Pages\\OrderHistoryPage.cs:line 61\n   at SmartCommerce.E2E.Tests.OrderHistoryTests.DeliveredOrder_SubmitDefectiveItemReturn_ShouldGenerateRmaLabel() in C:\\repo\\SmartCommerce.E2E\\Tests\\OrderHistoryTests.cs:line 93",
+    "category": "UI Locator Change",
+    "root_cause": "`<input type='radio' name='rmaReasonCode'>` elements are void HTML tags and do not have inner text; filtering them with `.Filter(new() { HasText = reasonValue })` in `SubmitReturnMerchandiseAuthorizationAsync` always resolves to 0 elements after the label wrapper was moved to a sibling `<label>`.",
+    "resolution": "Updated `SubmitReturnMerchandiseAuthorizationAsync` in `OrderHistoryPage.cs` (line 61) to locate by value attribute (`_page.Locator($\"input[name='rmaReasonCode'][value='{reasonValue}']\").CheckAsync()`) or `_page.GetByLabel(reasonValue).CheckAsync()`."
+  },
+  {
+    "incident_id": "INC-2026-021",
+    "test_name": "SmartCommerce.E2E.Tests.OrderHistoryTests.RecentOrder_SearchByOrderId_ShouldDisplayMatchingOrderCard",
+    "error_message": "Microsoft.Playwright.PlaywrightException : Expect(Locator).ToContainTextAsync() failed\nLocator: Locator(\"article[data-testid='order-history-card']\").First\nExpected substring: \"ORD-2026-99412\"\nReceived: <element(s) not found>\nCall log:\n  - Expect \"ToContainTextAsync\" with timeout 10000ms",
+    "stack_trace": "   at Microsoft.Playwright.Core.AssertionsBase.ExpectImplAsync(String expression, FrameExpectOptions expectOptions, Object expected, String message) in /_/src/Playwright/Core/AssertionsBase.cs:line 98\n   at SmartCommerce.E2E.Pages.OrderHistoryPage.SearchOrderByIdAsync(String orderId) in C:\\repo\\SmartCommerce.E2E\\Pages\\OrderHistoryPage.cs:line 44\n   at SmartCommerce.E2E.Tests.OrderHistoryTests.RecentOrder_SearchByOrderId_ShouldDisplayMatchingOrderCard() in C:\\repo\\SmartCommerce.E2E\\Tests\\OrderHistoryTests.cs:line 55",
+    "category": "Test Data / Environment Issue",
+    "root_cause": "The QA database cleanup cron job purged orders older than 7 days, deleting the static fixture order `ORD-2026-99412` referenced by `SearchOrderByIdAsync`.",
+    "resolution": "Updated `OrderHistoryTests` setup fixture to dynamically seed a fresh order via `POST /api/v2/test-harness/orders` prior to executing search assertions."
+  },
+  {
+    "incident_id": "INC-2026-022",
+    "test_name": "SmartCommerce.E2E.Tests.OrderHistoryTests.InTransitOrder_VerifyLiveCarrierWebhookBadge_ShouldShowOutForDelivery",
+    "error_message": "Microsoft.Playwright.PlaywrightException : Expect(Locator).ToHaveTextAsync() failed\nLocator: GetByTestId(\"carrier-webhook-status-pill\")\nExpected string: \"Out for Delivery\"\nReceived string: \"Label Created - Awaiting Carrier Scan\"\nCall log:\n  - Expect \"ToHaveTextAsync\" with timeout 12000ms",
+    "stack_trace": "   at Microsoft.Playwright.Core.AssertionsBase.ExpectImplAsync(String expression, FrameExpectOptions expectOptions, Object expected, String message) in /_/src/Playwright/Core/AssertionsBase.cs:line 98\n   at SmartCommerce.E2E.Pages.OrderHistoryPage.AssertCarrierTrackingStatusAsync(String expectedStatusText) in C:\\repo\\SmartCommerce.E2E\\Pages\\OrderHistoryPage.cs:line 69\n   at SmartCommerce.E2E.Tests.OrderHistoryTests.InTransitOrder_VerifyLiveCarrierWebhookBadge_ShouldShowOutForDelivery() in C:\\repo\\SmartCommerce.E2E\\Tests\\OrderHistoryTests.cs:line 119",
+    "category": "Race Condition / Missing Wait",
+    "root_cause": "The RabbitMQ carrier webhook consumer processes shipment status transitions asynchronously (~3-5 seconds after order creation), and the React UI only polls on page reload. `AssertCarrierTrackingStatusAsync` checked the static DOM pill without triggering a poll refresh.",
+    "resolution": "Wrapped the assertion in `AssertCarrierTrackingStatusAsync` (`OrderHistoryPage.cs`, line 69) inside `Assertions.Expect(async () => { await _page.ReloadAsync(); await Assertions.Expect(LiveCarrierTrackingBadge).ToHaveTextAsync(expectedStatusText); }).ToPassAsync()`."
   }
 ]
